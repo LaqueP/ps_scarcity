@@ -13,7 +13,7 @@ class Ps_Scarcity extends Module
     public function __construct()
     {
         $this->name = 'ps_scarcity';
-        $this->version = '1.1.2';
+        $this->version = '1.1.3';
         $this->author = 'TuNombre';
         $this->tab = 'front_office_features';
         $this->bootstrap = true;
@@ -326,18 +326,22 @@ class Ps_Scarcity extends Module
 
     /* ----------------- Hooks front ----------------- */
 
-    public function hookActionFrontControllerSetMedia($params)
-    {
-        if (!isset($this->context->controller)) { return; }
-        // JS solo es necesario en la ficha de producto (cambios de combinación)
-        if ($this->context->controller->php_self === 'product') {
-            $this->context->controller->registerJavascript(
-                'module-'.$this->name.'-scarcity',
-                'modules/'.$this->name.'/views/js/psscarcity.js',
-                ['position' => 'bottom', 'priority' => 150]
-            );
-        }
-    }
+public function hookActionFrontControllerSetMedia($params)
+{
+    if (!isset($this->context->controller)) { return; }
+
+    // Cargar SIEMPRE y con parámetro de versión para romper caché
+    $this->context->controller->registerJavascript(
+        'module-'.$this->name.'-scarcity',
+        'modules/'.$this->name.'/views/js/psscarcity.js?v='.$this->version,
+        [
+            'position' => 'bottom',
+            'priority' => 150,
+            'server'   => 'local',
+        ]
+    );
+}
+
 
     public function hookDisplayProductPriceBlock($params)
     {

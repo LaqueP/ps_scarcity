@@ -1,5 +1,9 @@
 (function () {
-  // --- Tramos
+  'use strict';
+  if (window.__PS_SCARCITY_LOADED) return;
+  window.__PS_SCARCITY_LOADED = true;
+  window.__PS_SCARCITY_VERSION = '1.1.3';
+
   function band(q){
     q = parseInt(q,10) || 0;
     if (q <= 0) return null;
@@ -9,7 +13,6 @@
     return null;
   }
 
-  // --- Render helpers
   function setHtmlForBand(box, b, q){
     var msg;
     if (b === 'one') {
@@ -47,13 +50,20 @@
 
   function applyAll(q){
     if (q === null || typeof q === 'undefined') return;
-    document.querySelectorAll('[data-psscarcity]').forEach(function(box){
-      renderBox(box, q);
-    });
+    var boxes = document.querySelectorAll('[data-psscarcity]');
+    for (var i=0; i<boxes.length; i++){
+      renderBox(boxes[i], q);
+    }
   }
 
-  // --- Lecturas: CE puede no refrescar el dataset, así que priorizamos el DOM visible del stock
-  function pick(obj, keys){ for (var i=0;i<keys.length;i++){ var v = obj ? obj[keys[i]] : undefined; var n = parseInt(v,10); if (!isNaN(n)) return n; } return null; }
+  function pick(obj, keys){
+    for (var i=0;i<keys.length;i++){
+      var v = obj ? obj[keys[i]] : undefined;
+      var n = parseInt(v,10);
+      if (!isNaN(n)) return n;
+    }
+    return null;
+  }
 
   function readFromDataset(){
     var el = document.querySelector('#product-details[data-product]');
@@ -64,25 +74,22 @@
     var ipaEl = document.querySelector('input[name="id_product_attribute"]');
     var ipa = ipaEl ? (isNaN(parseInt(ipaEl.value,10)) ? ipaEl.value : parseInt(ipaEl.value,10)) : null;
 
-    // 1) Por combinación actual
     if (ipa != null && data.combinations){
       var combo = data.combinations[ipa] || data.combinations[String(ipa)];
       var qCombo = pick(combo, ['quantity','available_quantity','quantity_available','stock','stock_quantity']);
       if (qCombo !== null) return qCombo;
     }
-    // 2) Global (a veces es la de la combinación por defecto -> poco fiable en CE)
     return pick(data, ['quantity','available_quantity','quantity_available','stock','stock_quantity']);
   }
 
-  // LECTOR ROBUSTO DEL DOM VISIBLE (no genérico): solo lee el número de .product-quantities span
   function readFromQuantitiesDom(){
-    var candidates = [
-      '.product-quantities span',           // PS 1.7/8
-      '.product-quantities .js-qty',        // algunos temas
+    var selectors = [
+      '.product-quantities span',
+      '.product-quantities .js-qty',
       '#product-availability .product-quantities span'
     ];
-    for (var i=0;i<candidates.length;i++){
-      var el = document.querySelector(candidates[i]);
+    for (var i=0;i<selectors.length;i++){
+      var el = document.querySelector(selectors[i]);
       if (!el) continue;
       var text = (el.getAttribute('data-stock') || el.textContent || '').trim();
       var m = text.match(/-?\d+/);
@@ -97,30 +104,32 @@
   function readFromContainer(){
     var box = document.querySelector('[data-psscarcity][data-qty]');
     if (!box) return null;
-    var v = parseInt(box.getAttribute('data-qty') || 'NaN',10);
-    return isNaN(v) ? null : v;
+    var n = parseInt(box.getAttribute('data-qty') || 'NaN',10);
+    return isNaN(n) ? null : n;
   }
 
-  // Preferencia: DOM visible > dataset CE > SSR
   function readQtyPreferDom(){
-    return readFromQuantitiesDom() ?? readFromDataset() ?? readFromContainer();
+    var q = readFromQuantitiesDom();
+    if (q === null) q = readFromDataset();
+    if (q === null) q = readFromContainer();
+    return q;
   }
 
-  // --- Inicial
   (function init(){
     var q = readQtyPreferDom();
     if (q !== null) applyAll(q);
   })();
 
-  // --- Reactivo tras evento de PS/CE: espera un poco y vuelve a leer el DOM
   function onProductUpdatedCE(){
-    // varios ticks por si CE pinta tarde
-    [20, 60, 120, 200].forEach(function(ms){
-      setTimeout(function(){
-        var q = readQtyPreferDom();
-        if (q !== null) applyAll(q);
-      }, ms);
-    });
+    var delays = [20, 60, 120, 200];
+    for (var i=0;i<delays.length;i++){
+      (function(ms){
+        setTimeout(function(){
+          var q = readQtyPreferDom();
+          if (q !== null) applyAll(q);
+        }, ms);
+      })(delays[i]);
+    }
   }
 
   if (window.prestashop && prestashop.on){
@@ -128,7 +137,6 @@
     prestashop.on('updateProduct',  onProductUpdatedCE);
   }
 
-  // --- PLUS: si CE reescribe solo el bloque de cantidades, observamos ese nodo
   var qWrap = document.querySelector('.product-quantities');
   if (qWrap && window.MutationObserver){
     new MutationObserver(function(){

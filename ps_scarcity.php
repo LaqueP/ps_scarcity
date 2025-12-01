@@ -12,10 +12,10 @@ class Ps_Scarcity extends Module
 
     public function __construct()
     {
-        $this->name = 'ps_scarcity';
-        $this->version = '1.1.3';
-        $this->author = 'TuNombre';
-        $this->tab = 'front_office_features';
+        $this->name      = 'ps_scarcity';
+        $this->version   = '1.2.3'; // cache-busting para el JS
+        $this->author    = 'LaqueP';
+        $this->tab       = 'front_office_features';
         $this->bootstrap = true;
 
         parent::__construct();
@@ -27,7 +27,7 @@ class Ps_Scarcity extends Module
 
     public function install()
     {
-        $langs = Language::getIDs(false);
+        $langs   = Language::getIDs(false);
         $defOne  = [];
         $defLt10 = [];
         $defLt20 = [];
@@ -38,12 +38,15 @@ class Ps_Scarcity extends Module
         }
 
         return parent::install()
-            /* hooks para insertar el banner */
+            /* hooks front para insertar/inyectar */
             && $this->registerHook('displayScarcityBanner')    // uso general (Smarty/CE)
             && $this->registerHook('displayScarcitySpecial')   // “especial” a demanda
             && $this->registerHook('displayProductPriceBlock') // after_price
             && $this->registerHook('displayAfterPrice')        // compat. algunos temas
             && $this->registerHook('actionFrontControllerSetMedia')
+            && $this->registerHook('displayHeader')            // fallback para algunos temas/CE
+            /* hook BO para JS de administración */
+            && $this->registerHook('displayBackOfficeHeader')
             /* configuración por defecto */
             && Configuration::updateValue(self::CFG_TEXT_ONE,  $defOne,  false)
             && Configuration::updateValue(self::CFG_TEXT_LT10, $defLt10, false)
@@ -72,9 +75,9 @@ class Ps_Scarcity extends Module
             $langs = Language::getIDs(false);
             $vOne = []; $v10 = []; $v20 = [];
             foreach ($langs as $id_lang) {
-                $vOne[$id_lang]  = (string)Tools::getValue(self::CFG_TEXT_ONE.'_'.$id_lang,  '');
-                $v10[$id_lang]   = (string)Tools::getValue(self::CFG_TEXT_LT10.'_'.$id_lang, '');
-                $v20[$id_lang]   = (string)Tools::getValue(self::CFG_TEXT_LT20.'_'.$id_lang, '');
+                $vOne[$id_lang] = (string)Tools::getValue(self::CFG_TEXT_ONE.'_'.$id_lang, '');
+                $v10[$id_lang]  = (string)Tools::getValue(self::CFG_TEXT_LT10.'_'.$id_lang, '');
+                $v20[$id_lang]  = (string)Tools::getValue(self::CFG_TEXT_LT20.'_'.$id_lang, '');
             }
             Configuration::updateValue(self::CFG_TEXT_ONE,  $vOne, false);
             Configuration::updateValue(self::CFG_TEXT_LT10, $v10,  false);
@@ -107,50 +110,50 @@ class Ps_Scarcity extends Module
                 'description' => $this->l('Define mensajes distintos para 1 unidad, menos de 10 y menos de 20. Usa %count% como marcador del número real.'),
                 'input' => [
                     [
-                        'type' => 'text',
-                        'label' => $this->l('Mensaje para 1 unidad'),
-                        'name' => self::CFG_TEXT_ONE,
-                        'lang' => true,
-                        'required' => true,
-                        'desc' => $this->l('Ej.: "¡Última unidad con envío inmediato!" (no usa %count%).'),
+                        'type'    => 'text',
+                        'label'   => $this->l('Mensaje para 1 unidad'),
+                        'name'    => self::CFG_TEXT_ONE,
+                        'lang'    => true,
+                        'required'=> true,
+                        'desc'    => $this->l('Ej.: "¡Última unidad con envío inmediato!" (no usa %count%).'),
                     ],
                     [
-                        'type' => 'text',
-                        'label' => $this->l('Mensaje para < 10 unidades'),
-                        'name' => self::CFG_TEXT_LT10,
-                        'lang' => true,
-                        'required' => true,
-                        'desc' => $this->l('Ej.: "¡Quedan %count% unidades — casi agotado!"'),
+                        'type'    => 'text',
+                        'label'   => $this->l('Mensaje para < 10 unidades'),
+                        'name'    => self::CFG_TEXT_LT10,
+                        'lang'    => true,
+                        'required'=> true,
+                        'desc'    => $this->l('Ej.: "¡Quedan %count% unidades — casi agotado!"'),
                     ],
                     [
-                        'type' => 'text',
-                        'label' => $this->l('Mensaje para < 20 unidades'),
-                        'name' => self::CFG_TEXT_LT20,
-                        'lang' => true,
-                        'required' => true,
-                        'desc' => $this->l('Ej.: "¡Quedan %count% unidades — no lo dejes pasar!"'),
+                        'type'    => 'text',
+                        'label'   => $this->l('Mensaje para < 20 unidades'),
+                        'name'    => self::CFG_TEXT_LT20,
+                        'lang'    => true,
+                        'required'=> true,
+                        'desc'    => $this->l('Ej.: "¡Quedan %count% unidades — no lo dejes pasar!"'),
                     ],
                     [
-                        'type' => 'switch',
-                        'label' => $this->l('Insertar automáticamente bajo el precio'),
-                        'name' => self::CFG_AUTO_AFTER_PRICE,
-                        'is_bool' => true,
+                        'type'   => 'switch',
+                        'label'  => $this->l('Insertar automáticamente bajo el precio'),
+                        'name'   => self::CFG_AUTO_AFTER_PRICE,
+                        'is_bool'=> true,
                         'values' => [
                             ['id' => 'auto_on',  'value' => 1, 'label' => $this->l('Sí')],
                             ['id' => 'auto_off', 'value' => 0, 'label' => $this->l('No')],
                         ],
-                        'desc' => $this->l('Si vas a insertarlo con Creative Elements o Smarty, desactívalo para evitar duplicados.'),
+                        'desc'   => $this->l('Si vas a insertarlo con Creative Elements o Smarty, desactívalo para evitar duplicados.'),
                     ],
                     [
-                        'type' => 'switch',
-                        'label' => $this->l('Evitar duplicados (mostrar una sola vez)'),
-                        'name' => self::CFG_SINGLETON,
-                        'is_bool' => true,
+                        'type'   => 'switch',
+                        'label'  => $this->l('Evitar duplicados (mostrar una sola vez)'),
+                        'name'   => self::CFG_SINGLETON,
+                        'is_bool'=> true,
                         'values' => [
                             ['id' => 'single_on',  'value' => 1, 'label' => $this->l('Sí')],
                             ['id' => 'single_off', 'value' => 0, 'label' => $this->l('No')],
                         ],
-                        'desc' => $this->l('Si está activado, el banner se mostrará solo la primera vez que se invoque en la página.'),
+                        'desc'   => $this->l('Si está activado, el banner se mostrará solo la primera vez que se invoque en la página.'),
                     ],
                 ],
                 'submit' => [
@@ -200,7 +203,7 @@ class Ps_Scarcity extends Module
         $mod = pSQL($this->name);
         $langOptions = '';
         foreach ($languages as $lang) {
-            $id = (int)$lang['id_lang'];
+            $id  = (int)$lang['id_lang'];
             $iso = Tools::safeOutput($lang['iso_code']);
             $name = Tools::safeOutput($lang['name']);
             $selected = ($id == (int)$this->context->language->id) ? ' selected' : '';
@@ -210,21 +213,17 @@ class Ps_Scarcity extends Module
         $shortSmarty = "{hook h='displayScarcitySpecial' mod='{$mod}' product=\$product}";
         $shortId     = "{hook h='displayScarcitySpecial' mod='{$mod}' id_product=123 id_product_attribute=0}";
 
-        $CFG_ONE  = self::CFG_TEXT_ONE;
-        $CFG_10   = self::CFG_TEXT_LT10;
-        $CFG_20   = self::CFG_TEXT_LT20;
-
         $html = '
         <div class="panel">
             <h3><i class="icon-info-circle"></i> '.$this->l('Cómo insertar el banner').'</h3>
             <ol>
               <li><strong>'.$this->l('Automático bajo el precio').'</strong> — '.$this->l('Activa “Insertar automáticamente bajo el precio”.').'</li>
               <li><strong>'.$this->l('En tu plantilla (Smarty) o Creative Elements (Shortcode)').'</strong><br>
-                <pre style="margin:8px 0;">'.Tools::safeOutput($shortSmarty).'</pre>
+                <pre id="psscarcity-short-smarty" style="margin:8px 0;">'.Tools::safeOutput($shortSmarty).'</pre>
                 <button type="button" class="btn btn-default" id="psscarcity-copy-smarty"><i class="icon-copy"></i> '.$this->l('Copiar shortcode').'</button>
               </li>
               <li><strong>'.$this->l('Sin contexto de producto (landing/CMS)').'</strong><br>
-                <pre style="margin:8px 0;">'.Tools::safeOutput($shortId).'</pre>
+                <pre id="psscarcity-short-id" style="margin:8px 0;">'.Tools::safeOutput($shortId).'</pre>
                 <button type="button" class="btn btn-default" id="psscarcity-copy-id"><i class="icon-copy"></i> '.$this->l('Copiar shortcode por ID').'</button>
               </li>
             </ol>
@@ -243,105 +242,56 @@ class Ps_Scarcity extends Module
             </div>
             <div id="psscarcity-preview" class="alert alert-warning" style="margin-top:15px; display:none;"></div>
             <p class="help-block" style="margin-top:8px;">'.$this->l('SSR: el servidor renderiza el texto y %count% se sustituye por las unidades reales. El JS solo refresca cuando cambias de combinación.').'</p>
-        </div>
-
-        <script>
-        (function(){
-          var CFG_ONE = "'.$CFG_ONE.'";
-          var CFG_10  = "'.$CFG_10.'";
-          var CFG_20  = "'.$CFG_20.'";
-
-          function getVal(cfg, idLang){
-            var sel = "[name=\'"+cfg+"_"+idLang+"\']";
-            var el = document.querySelector(sel);
-            return el ? el.value : "";
-          }
-
-          function band(q){
-            q = parseInt(q,10) || 0;
-            if (q <= 0) return null;
-            if (q === 1) return "one";
-            if (q < 10) return "lt10";
-            if (q < 20) return "lt20";
-            return null;
-          }
-
-          var $lang = document.getElementById("psscarcity-lang");
-          var $q = document.getElementById("psscarcity-q");
-          var $ql = document.getElementById("psscarcity-q-label");
-          var $prev = document.getElementById("psscarcity-preview");
-
-          function render(){
-            var idLang = parseInt($lang.value,10);
-            var q = parseInt($q.value,10);
-            $ql.textContent = q;
-            var b = band(q);
-            if (!b){
-              $prev.style.display = "none";
-              $prev.innerHTML = "";
-              return;
-            }
-            var msg;
-            if (b === "one") {
-              msg = getVal(CFG_ONE, idLang) || "¡Última unidad con envío inmediato!";
-              $prev.innerHTML = msg;
-            } else if (b === "lt10") {
-              msg = getVal(CFG_10, idLang) || "¡Quedan %count% unidades — casi agotado!";
-              $prev.innerHTML = msg.replace("%count%", "<strong>"+q+"</strong>");
-            } else {
-              msg = getVal(CFG_20, idLang) || "¡Quedan %count% unidades — no lo dejes pasar!";
-              $prev.innerHTML = msg.replace("%count%", "<strong>"+q+"</strong>");
-            }
-            $prev.style.display = "";
-          }
-
-          document.addEventListener("input", function(e){
-            var n = e.target && e.target.name || "";
-            if (n.indexOf(CFG_ONE+"_") === 0 || n.indexOf(CFG_10+"_") === 0 || n.indexOf(CFG_20+"_") === 0){
-              render();
-            }
-          });
-          $lang.addEventListener("change", render);
-          $q.addEventListener("input", render);
-
-          function copy(txt){
-            if (navigator.clipboard && navigator.clipboard.writeText){
-              navigator.clipboard.writeText(txt);
-            } else {
-              var ta = document.createElement("textarea");
-              ta.value = txt; document.body.appendChild(ta);
-              ta.select(); document.execCommand("copy");
-              document.body.removeChild(ta);
-            }
-          }
-          document.getElementById("psscarcity-copy-smarty").addEventListener("click", function(){ copy("'.addslashes($shortSmarty).'"); });
-          document.getElementById("psscarcity-copy-id").addEventListener("click", function(){ copy("'.addslashes($shortId).'"); });
-
-          render();
-        })();
-        </script>';
+        </div>';
 
         return $html;
     }
 
-    /* ----------------- Hooks front ----------------- */
+    /* ----------------- Hooks front/back ----------------- */
 
-public function hookActionFrontControllerSetMedia($params)
-{
-    if (!isset($this->context->controller)) { return; }
+    // Helper para cargar JS en FO con fallback a addJS en caso legacy
+    protected function addFrontJs($file)
+    {
+        $c = (isset($this->context->controller) ? $this->context->controller : null);
+        if (!$c) { return; }
 
-    // Cargar SIEMPRE y con parámetro de versión para romper caché
-    $this->context->controller->registerJavascript(
-        'module-'.$this->name.'-scarcity',
-        'modules/'.$this->name.'/views/js/psscarcity.js?v='.$this->version,
-        [
-            'position' => 'bottom',
-            'priority' => 150,
-            'server'   => 'local',
-        ]
-    );
-}
+        if (method_exists($c, 'registerJavascript')) {
+            $c->registerJavascript(
+                'module-'.$this->name.'-scarcity',
+                $file,
+                ['position' => 'bottom', 'priority' => 999, 'server' => 'local']
+            );
+        } else {
+            // Fallback legacy
+            if (method_exists($c, 'addJS')) {
+                $c->addJS($file);
+            }
+        }
+    }
 
+    public function hookActionFrontControllerSetMedia($params)
+    {
+        $this->addFrontJs($this->_path.'views/js/psscarcity.js?v='.$this->version);
+    }
+
+    public function hookDisplayHeader($params)
+    {
+        $this->addFrontJs($this->_path.'views/js/psscarcity.js?v='.$this->version);
+    }
+
+    public function hookDisplayBackOfficeHeader($params)
+    {
+        // Solo en la pantalla de configuración del módulo
+        if (Tools::getValue('configure') !== $this->name) {
+            return;
+        }
+        if (isset($this->context->controller) && method_exists($this->context->controller, 'addJS')) {
+            $this->context->controller->addJS(
+                $this->_path.'views/js/admin/psscarcity-admin.js?v='.$this->version
+            );
+        }
+        // (Opcional) añadir CSS admin con addCSS si lo necesitas
+    }
 
     public function hookDisplayProductPriceBlock($params)
     {
@@ -391,10 +341,10 @@ public function hookActionFrontControllerSetMedia($params)
             return '';
         }
 
-        // 1) Obtener $product desde el hook o variable Smarty
+        // 1) Producto del hook/Smarty
         $product = $params['product'] ?? $this->context->smarty->getTemplateVars('product');
 
-        // 2) Fallback: id_product explícito (CMS/landing/CE)
+        // 2) Fallback por id (CMS/CE)
         if (!is_array($product) || !isset($product['quantity'])) {
             $idProduct = (int)($params['id_product'] ?? Tools::getValue('id_product'));
             $idPA      = (int)($params['id_product_attribute'] ?? Tools::getValue('id_product_attribute'));
@@ -405,41 +355,38 @@ public function hookActionFrontControllerSetMedia($params)
         }
 
         if (!is_array($product) || !isset($product['quantity'])) {
-            return '';
+            return ''; // sin contexto de cantidad, no pintamos nada
         }
 
-        // SIEMPRE usar la cantidad real
         $qty  = (int)$product['quantity'];
-        $band = $this->computeBand($qty);
-        if ($band === null) {
-            return '';
-        }
+        $band = $this->computeBand($qty); // 'one' | 'lt10' | 'lt20' | null
 
         $id_lang = (int)$this->context->language->id;
         $msgOne  = (string)Configuration::get(self::CFG_TEXT_ONE,  $id_lang);
         $msg10   = (string)Configuration::get(self::CFG_TEXT_LT10, $id_lang);
         $msg20   = (string)Configuration::get(self::CFG_TEXT_LT20, $id_lang);
 
-        // Sanitizar y preparar SSR
         $msgOneSafe = Tools::safeOutput($msgOne);
         $msg10Safe  = Tools::safeOutput($msg10);
         $msg20Safe  = Tools::safeOutput($msg20);
 
+        // HTML SSR (si no hay banda, quedará vacío y el contenedor saldrá oculto)
+        $finalHtml = '';
         if ($band === 'one') {
-            $finalHtml = $msgOneSafe; // sin %count%
+            $finalHtml = $msgOneSafe;
         } elseif ($band === 'lt10') {
             $finalHtml = str_replace('%count%', '<strong class="ps-scarcity-count">'.$qty.'</strong>', $msg10Safe);
-        } else { // lt20
+        } elseif ($band === 'lt20') {
             $finalHtml = str_replace('%count%', '<strong class="ps-scarcity-count">'.$qty.'</strong>', $msg20Safe);
         }
 
         $this->context->smarty->assign([
-            'psscarcity_qty'     => $qty,
-            'psscarcity_band'    => $band,
+            'psscarcity_qty'     => $qty,              // 0 si no stock
+            'psscarcity_band'    => $band,             // null → placeholder oculto
             'psscarcity_msg_one' => $msgOneSafe,
             'psscarcity_msg_10'  => $msg10Safe,
             'psscarcity_msg_20'  => $msg20Safe,
-            'psscarcity_final'   => $finalHtml,
+            'psscarcity_final'   => $finalHtml,        // puede estar vacío si band=null
         ]);
 
         $html = $this->fetch('module:'.$this->name.'/views/templates/hook/scarcity.tpl');

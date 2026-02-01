@@ -1,147 +1,97 @@
 (function () {
-  'use strict';
-  if (window.__PS_SCARCITY_LOADED) return;
-  window.__PS_SCARCITY_LOADED = true;
-  window.__PS_SCARCITY_VERSION = '1.1.3';
+    'use strict';
 
-  function band(q){
-    q = parseInt(q,10) || 0;
-    if (q <= 0) return null;
-    if (q === 1) return 'one';
-    if (q < 10)  return 'lt10';
-    if (q < 20)  return 'lt20';
-    return null;
-  }
+    if (window.__PS_SCARCITY_LOADED) return;
+    window.__PS_SCARCITY_LOADED = true;
 
-  function setHtmlForBand(box, b, q){
-    var msg;
-    if (b === 'one') {
-      msg = box.getAttribute('data-msg-one') || '¡Última unidad!';
-      box.innerHTML = msg;
-    } else if (b === 'lt10') {
-      msg = box.getAttribute('data-msg-10') || '¡Quedan %count% unidades — casi agotado!';
-      box.innerHTML = msg.replace('%count%', '<strong class="ps-scarcity-count">'+q+'</strong>');
-    } else if (b === 'lt20') {
-      msg = box.getAttribute('data-msg-20') || '¡Quedan %count% unidades — no lo dejes pasar!';
-      box.innerHTML = msg.replace('%count%', '<strong class="ps-scarcity-count">'+q+'</strong>');
+    // -----------------------------------
+    // Helpers
+    // -----------------------------------
+
+    function readStock() {
+        const el = document.querySelector('.product-quantities span[data-stock]');
+        if (!el) return null;
+        let qty = parseInt(el.dataset.stock, 10);
+        return isNaN(qty) ? null : qty;
     }
-    box.style.display = '';
-    box.setAttribute('data-band', b);
-    box.setAttribute('data-qty', q);
-  }
 
-  function updateCountOnly(box, q){
-    var num = box.querySelector('.ps-scarcity-count');
-    if (num) num.textContent = q;
-    box.setAttribute('data-qty', q);
-  }
-
-  function renderBox(box, q){
-    var b = band(q);
-    if (!b){ box.style.display = 'none'; return; }
-    var last = box.getAttribute('data-band') || '';
-    if (b !== last || !box.querySelector('.ps-scarcity-count')) {
-      setHtmlForBand(box, b, q);
-    } else {
-      updateCountOnly(box, q);
-      box.style.display = '';
+    function computeBand(box, qty) {
+        qty = parseInt(qty, 10) || 0;
+        if (qty <= 0) return null;
+        if (qty === 1) return 'one';
+        const lim10 = parseInt(box.dataset.limitLt10) || 10;
+        const lim20 = parseInt(box.dataset.limitLt20) || 20;
+        if (qty < lim10) return 'lt10';
+        if (qty >= lim10 && qty < lim20) return 'lt20';
+        return null;
     }
-  }
 
-  function applyAll(q){
-    if (q === null || typeof q === 'undefined') return;
-    var boxes = document.querySelectorAll('[data-psscarcity]');
-    for (var i=0; i<boxes.length; i++){
-      renderBox(boxes[i], q);
+    function setHtml(box, band, qty) {
+        let msg;
+        if (band === 'one') msg = box.dataset.msgOne;
+        else if (band === 'lt10') msg = box.dataset.msg10.replace('%count%', '<strong>' + qty + '</strong>');
+        else if (band === 'lt20') msg = box.dataset.msg20.replace('%count%', '<strong>' + qty + '</strong>');
+
+        box.innerHTML = msg;
+        box.style.display = '';
+        box.dataset.band = band || '';
+        box.dataset.qty = qty;
     }
-  }
 
-  function pick(obj, keys){
-    for (var i=0;i<keys.length;i++){
-      var v = obj ? obj[keys[i]] : undefined;
-      var n = parseInt(v,10);
-      if (!isNaN(n)) return n;
+    function hideBox(box) {
+        box.style.display = 'none';
+        box.dataset.band = '';
+        box.dataset.qty = 0;
     }
-    return null;
-  }
 
-  function readFromDataset(){
-    var el = document.querySelector('#product-details[data-product]');
-    if (!el || !el.dataset || !el.dataset.product) return null;
-    var data;
-    try { data = JSON.parse(el.dataset.product); } catch(_){ return null; }
+    function renderBox(box) {
+        if (box.dataset.hookManual === '1') return; // no tocar hooks manuales
 
-    var ipaEl = document.querySelector('input[name="id_product_attribute"]');
-    var ipa = ipaEl ? (isNaN(parseInt(ipaEl.value,10)) ? ipaEl.value : parseInt(ipaEl.value,10)) : null;
+        const qty = readStock();
+        if (!qty || qty <= 0) { hideBox(box); return; }
 
-    if (ipa != null && data.combinations){
-      var combo = data.combinations[ipa] || data.combinations[String(ipa)];
-      var qCombo = pick(combo, ['quantity','available_quantity','quantity_available','stock','stock_quantity']);
-      if (qCombo !== null) return qCombo;
+        const band = computeBand(box, qty);
+        if (!band) { hideBox(box); return; }
+
+        const last = box.dataset.band || '';
+        if (band !== last || !box.querySelector('.ps-scarcity-count')) {
+            setHtml(box, band, qty);
+        } else {
+            const countEl = box.querySelector('.ps-scarcity-count');
+            if (countEl) countEl.textContent = qty;
+            box.dataset.qty = qty;
+            box.style.display = '';
+        }
     }
-    return pick(data, ['quantity','available_quantity','quantity_available','stock','stock_quantity']);
-  }
 
-  function readFromQuantitiesDom(){
-    var selectors = [
-      '.product-quantities span',
-      '.product-quantities .js-qty',
-      '#product-availability .product-quantities span'
-    ];
-    for (var i=0;i<selectors.length;i++){
-      var el = document.querySelector(selectors[i]);
-      if (!el) continue;
-      var text = (el.getAttribute('data-stock') || el.textContent || '').trim();
-      var m = text.match(/-?\d+/);
-      if (m) {
-        var n = parseInt(m[0],10);
-        if (!isNaN(n)) return n;
-      }
+    function applyAll() {
+        document.querySelectorAll('[data-psscarcity]').forEach(renderBox);
     }
-    return null;
-  }
 
-  function readFromContainer(){
-    var box = document.querySelector('[data-psscarcity][data-qty]');
-    if (!box) return null;
-    var n = parseInt(box.getAttribute('data-qty') || 'NaN',10);
-    return isNaN(n) ? null : n;
-  }
+    // -----------------------------------
+    // Init
+    // -----------------------------------
+    function init() {
+        applyAll();
 
-  function readQtyPreferDom(){
-    var q = readFromQuantitiesDom();
-    if (q === null) q = readFromDataset();
-    if (q === null) q = readFromContainer();
-    return q;
-  }
+        // 1) Detectar cambio de color / combinación usando hash
+        window.addEventListener('hashchange', () => setTimeout(applyAll, 20));
 
-  (function init(){
-    var q = readQtyPreferDom();
-    if (q !== null) applyAll(q);
-  })();
+        // 2) Escuchar eventos Prestashop
+        if (window.prestashop && prestashop.on) {
+            prestashop.on('updatedProduct', () => setTimeout(applyAll, 20));
+            prestashop.on('updateProduct', () => setTimeout(applyAll, 20));
+        }
 
-  function onProductUpdatedCE(){
-    var delays = [20, 60, 120, 200];
-    for (var i=0;i<delays.length;i++){
-      (function(ms){
-        setTimeout(function(){
-          var q = readQtyPreferDom();
-          if (q !== null) applyAll(q);
-        }, ms);
-      })(delays[i]);
+        // 3) Observador mínimo solo sobre el stock span
+        const stockEl = document.querySelector('.product-quantities span[data-stock]');
+        if (stockEl && window.MutationObserver) {
+            new MutationObserver(() => setTimeout(applyAll, 20))
+                .observe(stockEl, { attributes: true, attributeFilter: ['data-stock'] });
+        }
     }
-  }
 
-  if (window.prestashop && prestashop.on){
-    prestashop.on('updatedProduct', onProductUpdatedCE);
-    prestashop.on('updateProduct',  onProductUpdatedCE);
-  }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 
-  var qWrap = document.querySelector('.product-quantities');
-  if (qWrap && window.MutationObserver){
-    new MutationObserver(function(){
-      var q = readFromQuantitiesDom();
-      if (q !== null) applyAll(q);
-    }).observe(qWrap, {childList:true, subtree:true, characterData:true});
-  }
 })();

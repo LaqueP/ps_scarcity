@@ -1,10 +1,10 @@
 <?php
 /**
- *  2024 Stape.com
+ *  2024 nestdream.com
  *
- *  @author    Michael Derevyamchuk <derevmyk@ukr.net>
- *  @copyright 2024 Stape.com
- *  @license   Stape.com Commercial License
+ *  @author    Carlos Reyero
+ *  @copyright 2024 nestdream.com
+ *  @license   nestdream.com Commercial License
  */
 header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
 header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');

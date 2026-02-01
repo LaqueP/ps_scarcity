@@ -15,7 +15,7 @@ class Ps_Scarcity extends Module
     public function __construct()
     {
         $this->name      = 'ps_scarcity';
-        $this->version   = '1.2.9';
+        $this->version   = '1.3.0';
         $this->author    = 'LaqueP';
         $this->tab       = 'front_office_features';
         $this->bootstrap = true;
